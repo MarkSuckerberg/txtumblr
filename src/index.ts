@@ -1,8 +1,4 @@
-import {
-	TumblrBlocksPost,
-	TumblrNeueImageBlock,
-	TumblrNeueTextBlock,
-} from 'typeble';
+import { TumblrBlocksPost, TumblrNeueImageBlock, TumblrNeueTextBlock } from 'typeble';
 
 interface TumblrBotEnv {
 	TUMBLR_CONSUMER_KEY: string;
@@ -16,8 +12,8 @@ export default {
 		const username = trimmedPathInfo[0];
 		const postID = trimmedPathInfo[1];
 
-		if(!trimmedPathInfo.length) {
-			return Response.redirect("https://github.com/MarkSuckerberg/txtumblr", 301)
+		if (!trimmedPathInfo.length) {
+			return Response.redirect('https://github.com/MarkSuckerberg/txtumblr', 301);
 		}
 
 		if (!Number.isInteger(+postID)) {
@@ -97,7 +93,7 @@ function mainPage(
 	);
 
 	const imageIndex = url.searchParams.get('image');
-	const imagesToShow = imageIndex ? imageTags[+imageIndex] : imageTags.join('\n');
+	const imagesToShow = imageIndex ? imageTags[+imageIndex + 1] : imageTags.join('\n');
 
 	const title = `${post.blog.name} ${
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
