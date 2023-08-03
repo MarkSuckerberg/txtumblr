@@ -99,10 +99,12 @@ function mainPage(
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
 	}`;
 
+	const tags = post.tags.length ? `Tags: #${post.tags.join('# ')}\n` : '';
+
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>
-		<meta name="description" content="${text}" />
+		<meta name="description" content="${tags}${text}" />
 		<link rel="canonical" href="${post.post_url} />
 
 		<!-- OpenGraph embed tags -->
@@ -110,7 +112,7 @@ function mainPage(
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="${title}" />
 		<meta property="og:url" content="${post.post_url}" />
-		<meta property="og:description" content="${text}" />
+		<meta property="og:description" content="${tags}${text}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="summary_large_image">
@@ -119,7 +121,7 @@ function mainPage(
 		<meta property="twitter:creator" content="${post.blog_name}" />
 		<meta property="twitter:site" content="${post.blog.url}" />
 		<meta property="twitter:url" content="${post.post_url}" />
-		<meta property="twitter:description" content="${text}" />
+		<meta property="twitter:description" content="${tags}${text}" />
 
 		${imagesToShow}
 
