@@ -57,8 +57,8 @@ function oembed(post: TumblrBlocksPost): Response {
 	const response = {
 		author_name: `${post.note_count} 📝`,
 		author_url: post.blog.url,
-		provider_name: 'fxTumblr',
-		provider_url: '',
+		provider_name: 'txTumblr',
+		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
 		title: 'Tumblr',
 		type: 'link',
 		version: '1.0',
@@ -110,7 +110,7 @@ function mainPage(
 		<link rel="canonical" href="${post.post_url} />
 
 		<!-- OpenGraph embed tags -->
-		<meta property="og:site_name" content="fxTumblr Beta" />
+		<meta property="og:site_name" content="txTumblr" />
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="${title}" />
 		<meta property="og:url" content="${post.post_url}" />
