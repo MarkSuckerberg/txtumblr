@@ -1,0 +1,9 @@
+name = "fxtumblr"
+main = "./src/index.ts"
+compatibility_date = "2022-05-03"
+workers_dev = true
+
+route = { pattern = "fxtumblr.stellers.gay", zone_name = "stellers.gay" }
+
+[vars]
+TUMBLR_CONSUMER_KEY = "LWSrvWn1Mk8OzwjPnEK4JPXJQSSs2Ww7xPYWDKKJzLbEQuL5on"

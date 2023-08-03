@@ -1,0 +1,34 @@
+{
+	"name": "txtumblr",
+	"description": "API to retrieve better formatted embeds for tumblr posts",
+	"repository": "github:MarkSuckerberg/txtumblr",
+	"version": "1.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy src/index.ts",
+		"dev": "wrangler dev src/index.ts",
+		"test": "vitest run"
+	},
+	"keywords": [
+		"tumblr",
+		"cloudflare-workers",
+		"typescript"
+	],
+	"author": "Mark Suckerberg <mark@suckerberg.gay> (https://suckerberg.gay)",
+	"funding": {
+		"type": "ko-fi",
+		"url": "https://ko-fi.com/marksuckerberg"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20230518.0 ",
+		"vitest": "^0.31.0",
+		"wrangler": "^3.0.0"
+	},
+	"dependencies": {
+		"typeble": "^0.1.1"
+	},
+	"homepage": "https://github.com/MarkSuckerberg/typeble",
+	"bugs": {
+		"url": "https://github.com/MarkSuckerberg/typeble/issues"
+	}
+}
