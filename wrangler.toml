@@ -3,7 +3,12 @@ main = "./src/index.ts"
 compatibility_date = "2022-05-03"
 workers_dev = true
 
-route = { pattern = "fxtumblr.stellers.gay", zone_name = "stellers.gay" }
+routes = [
+	{ pattern = "fxtumblr.stellers.gay", custom_domain = true },
+	{ pattern = "txtumblr.stellers.gay", custom_domain = true },
+	{ pattern = "fxtumblr.suckerberg.gay", custom_domain = true },
+	{ pattern = "txtumblr.suckerberg.gay", custom_domain = true }
+]
 
 [vars]
 TUMBLR_CONSUMER_KEY = "LWSrvWn1Mk8OzwjPnEK4JPXJQSSs2Ww7xPYWDKKJzLbEQuL5on"

@@ -1,9 +1,7 @@
 import {
 	TumblrBlocksPost,
-	TumblrNeueContentBlock,
 	TumblrNeueImageBlock,
 	TumblrNeueTextBlock,
-	TumblrNeueVideoBlock,
 } from 'typeble';
 
 interface TumblrBotEnv {
@@ -17,6 +15,10 @@ export default {
 		const trimmedPathInfo = pathInfo.filter(string => string);
 		const username = trimmedPathInfo[0];
 		const postID = trimmedPathInfo[1];
+
+		if(!trimmedPathInfo.length) {
+			return Response.redirect("https://github.com/MarkSuckerberg/txtumblr", 301)
+		}
 
 		if (!Number.isInteger(+postID)) {
 			return new Response('Bad post ID', { status: 400 });
