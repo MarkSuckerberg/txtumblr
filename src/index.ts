@@ -99,8 +99,6 @@ function mainPage(
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
 	}`;
 
-	console.log(title);
-
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>

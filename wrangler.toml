@@ -4,6 +4,8 @@ compatibility_date = "2022-05-03"
 workers_dev = true
 
 routes = [
+	{ pattern = "txtumblr.com", custom_domain = true },
+	{ pattern = "www.txtumblr.com", custom_domain = true },
 	{ pattern = "fxtumblr.stellers.gay", custom_domain = true },
 	{ pattern = "txtumblr.stellers.gay", custom_domain = true },
 	{ pattern = "fxtumblr.suckerberg.gay", custom_domain = true },
