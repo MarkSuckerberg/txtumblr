@@ -1,4 +1,10 @@
-import { TumblrBlocksPost, TumblrNeueImageBlock, TumblrNeueTextBlock } from 'typeble';
+import {
+	FetchPost,
+	GetNotes,
+	TumblrBlocksPost,
+	TumblrNeueImageBlock,
+	TumblrNeueTextBlock,
+} from 'typeble';
 
 interface TumblrBotEnv {
 	TUMBLR_CONSUMER_KEY: string;
@@ -12,6 +18,8 @@ export default {
 		const username = trimmedPathInfo[0];
 		const postID = trimmedPathInfo[1];
 
+		const consumerID = env.TUMBLR_CONSUMER_KEY;
+
 		if (!trimmedPathInfo.length) {
 			return Response.redirect('https://github.com/MarkSuckerberg/txtumblr', 301);
 		}
@@ -24,36 +32,45 @@ export default {
 			return new Response('No username provided', { status: 400 });
 		}
 
-		//TODO: Make this properly use typeble
-		const postResponse = await fetch(
-			`https://www.tumblr.com/api/v2/blog/${username}/posts?api_key=${env.TUMBLR_CONSUMER_KEY}&id=${postID}&npf=true`
-		);
-		const postData: any = await postResponse.json();
-
-		if (!postData['response']['posts']) {
-			return new Response('Post not found', { status: 404 });
+		let post;
+		try {
+			post = await FetchPost<TumblrBlocksPost>(
+				consumerID,
+				username,
+				postID,
+				false,
+				false,
+				undefined,
+				true,
+				true
+			);
+		} catch (error) {
+			return new Response('Error retrieving post', { status: 404 });
 		}
 
-		const post = postData['response']['posts'][0] as TumblrBlocksPost;
 		const originalPost = post.trail[0] as TumblrBlocksPost;
 
 		if (url.searchParams.has('oembed')) {
-			return oembed(post);
+			return oembed(post, consumerID);
 		} else if (url.searchParams.has('json')) {
-			return new Response(JSON.stringify(post), {
-				headers: {
-					'content-type': 'text/json;charset=UTF-8',
-				},
-			});
+			return json(post);
 		} else {
 			return mainPage(post, originalPost, url);
 		}
 	},
 };
 
-function oembed(post: TumblrBlocksPost): Response {
+async function oembed(post: TumblrBlocksPost, consumerID: string) {
+	const notes = await GetNotes(
+		consumerID,
+		post.blog.name,
+		post.id_string,
+		undefined,
+		'conversation',
+		true
+	);
 	const response = {
-		author_name: `${post.note_count} 📝`,
+		author_name: `${post.note_count} 📝 | ${notes.total_reblogs} 🔁 | ${notes.total_likes} ❤️`,
 		author_url: post.blog.url,
 		provider_name: 'txTumblr',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
@@ -69,11 +86,19 @@ function oembed(post: TumblrBlocksPost): Response {
 	});
 }
 
-function mainPage(
+async function json(post: TumblrBlocksPost) {
+	return new Response(JSON.stringify(post), {
+		headers: {
+			'content-type': 'text/json;charset=UTF-8',
+		},
+	});
+}
+
+async function mainPage(
 	post: TumblrBlocksPost,
 	originalPost: TumblrBlocksPost | undefined,
 	url: URL
-): Response {
+) {
 	const blocks = originalPost ? originalPost.content.concat(post.content) : post.content;
 
 	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
@@ -99,13 +124,13 @@ function mainPage(
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
 	}`;
 
-	const tags = post.tags.length ? `Tags: #${post.tags.join('# ')}\n` : '';
+	const tags = post.tags.length ? `Tags: #${post.tags.join(' #')}\n` : '';
 
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>
 		<meta name="description" content="${tags}${text}" />
-		<link rel="canonical" href="${post.post_url} />
+		<link rel="canonical" href="${post.post_url}" />
 
 		<!-- OpenGraph embed tags -->
 		<meta property="og:site_name" content="txTumblr" />
