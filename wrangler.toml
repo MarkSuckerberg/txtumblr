@@ -1,4 +1,4 @@
-name = "fxtumblr"
+name = "txtumblr"
 main = "./src/index.ts"
 compatibility_date = "2022-05-03"
 workers_dev = true
@@ -13,4 +13,4 @@ routes = [
 ]
 
 [vars]
-TUMBLR_CONSUMER_KEY = "LWSrvWn1Mk8OzwjPnEK4JPXJQSSs2Ww7xPYWDKKJzLbEQuL5on"
+TUMBLR_CONSUMER_KEY = "GmsefnPqQxQ8WawhwtYUx7cWUPW9SZFMppM9qKCha1VrLaJ2kp"
