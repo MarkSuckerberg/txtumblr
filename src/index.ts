@@ -130,7 +130,7 @@ async function mainPage(
 	);
 
 	const imageIndex = url.searchParams.get('image');
-	const imagesToShow = imageIndex ? imageTags[+imageIndex + 1] : imageTags.join('\n');
+	const imagesToShow = imageIndex ? imageTags[+imageIndex - 1] : imageTags.join('\n');
 
 	const videoBlocks = blocks.filter(element => element.type == 'video') as TumblrNeueVideoBlock[];
 	const videoUrls = videoBlocks.map(block => block.url || block.media.url);
@@ -139,7 +139,7 @@ async function mainPage(
 	);
 
 	const videoIndex = url.searchParams.get('video');
-	const videosToShow = videoIndex ? videoTags[+videoIndex + 1] : videoTags.join('\n');
+	const videosToShow = videoIndex ? videoTags[+videoIndex - 1] : videoTags.join('\n');
 
 	const title = `${post.blog.name} ${
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
