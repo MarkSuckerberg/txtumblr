@@ -4,6 +4,7 @@ import {
 	TumblrBlocksPost,
 	TumblrNeueImageBlock,
 	TumblrNeueTextBlock,
+	TumblrNeueVideoBlock,
 } from 'typeble';
 
 interface TumblrBotEnv {
@@ -107,6 +108,11 @@ async function mainPage(
 ) {
 	const blocks = originalPost ? originalPost.content.concat(post.content) : post.content;
 
+	const twitterCard =
+		blocks.find(element => element.type == 'image' || element.type == 'video')?.type == 'video'
+			? 'player'
+			: 'summary_large_image';
+
 	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
 	const text = textBlocks.map(block => block.text).join('\n\n');
 
@@ -125,6 +131,15 @@ async function mainPage(
 
 	const imageIndex = url.searchParams.get('image');
 	const imagesToShow = imageIndex ? imageTags[+imageIndex + 1] : imageTags.join('\n');
+
+	const videoBlocks = blocks.filter(element => element.type == 'video') as TumblrNeueVideoBlock[];
+	const videoUrls = videoBlocks.map(block => block.url || block.media.url);
+	const videoTags = videoUrls.map(
+		videoUrl => `<meta property="og:video" content="${videoUrl}" />`
+	);
+
+	const videoIndex = url.searchParams.get('video');
+	const videosToShow = videoIndex ? videoTags[+videoIndex + 1] : videoTags.join('\n');
 
 	const title = `${post.blog.name} ${
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
@@ -146,7 +161,7 @@ async function mainPage(
 		<meta property="og:description" content="${tags}${text}" />
 
 		<!-- Twitter embed tags -->
-		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:card" content="${twitterCard}">
 		<meta property="twitter:domain" content="tumblr.com">
 		<meta property="twitter:title" content="${title}" />
 		<meta property="twitter:creator" content="${post.blog_name}" />
@@ -154,6 +169,7 @@ async function mainPage(
 		<meta property="twitter:url" content="${post.post_url}" />
 		<meta property="twitter:description" content="${tags}${text}" />
 
+		${videosToShow}
 		${imagesToShow}
 
 		<link
