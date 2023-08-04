@@ -69,6 +69,12 @@ async function oembed(post: TumblrBlocksPost, consumerID: string) {
 		'conversation',
 		true
 	);
+	if (!notes.total_likes) {
+		notes.total_likes = notes.notes.filter(note => note.type === 'like').length;
+	}
+	if (!notes.total_reblogs) {
+		notes.total_reblogs = notes.notes.filter(note => note.type === 'reblog').length;
+	}
 	const response = {
 		author_name: `${post.note_count} 📝 | ${notes.total_reblogs} 🔁 | ${notes.total_likes} ❤️`,
 		author_url: post.blog.url,
