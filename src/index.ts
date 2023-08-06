@@ -2,6 +2,8 @@ import {
 	FetchPost,
 	GetNotes,
 	TumblrBlocksPost,
+	TumblrNeueAudioBlock,
+	TumblrNeueAudioBlockBase,
 	TumblrNeueImageBlock,
 	TumblrNeueTextBlock,
 	TumblrNeueVideoBlock,
@@ -145,6 +147,12 @@ async function mainPage(
 		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
 	}`;
 
+	const audioBlocks = blocks.filter(element => element.type == 'audio') as TumblrNeueAudioBlock[];
+	const audioUrls = audioBlocks.map(block => block.url || block.media.url);
+	const audioTags = audioUrls.map(
+		audioUrl => `<meta property="og:audio" content="${audioUrl}" />`
+	);
+
 	const tags = post.tags.length ? `Tags: #${post.tags.join(' #')}\n` : '';
 
 	const html = `<!DOCTYPE html>
@@ -171,6 +179,7 @@ async function mainPage(
 
 		${videosToShow}
 		${imagesToShow}
+		${audioTags}
 
 		<link
 			rel="alternate"
