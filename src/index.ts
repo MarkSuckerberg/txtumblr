@@ -116,7 +116,10 @@ async function mainPage(
 			: 'summary_large_image';
 
 	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
-	const text = textBlocks.map(block => block.text).join('\n\n');
+	const text = textBlocks
+		.map(block => block.text)
+		.join('\n\n')
+		.replace(/"/g, '&quot;');
 
 	const imageBlocks = blocks.filter(element => element.type == 'image') as TumblrNeueImageBlock[];
 	const imageMediaObjects = imageBlocks.map(
@@ -154,11 +157,12 @@ async function mainPage(
 	);
 
 	const tags = post.tags.length ? `Tags: #${post.tags.join(' #')}\n` : '';
+	const body = `${tags}${text}`;
 
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>
-		<meta name="description" content="${tags}${text}" />
+		<meta name="description" content="${body}" />
 		<link rel="canonical" href="${post.post_url}" />
 
 		<!-- OpenGraph embed tags -->
@@ -166,7 +170,7 @@ async function mainPage(
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="${title}" />
 		<meta property="og:url" content="${post.post_url}" />
-		<meta property="og:description" content="${tags}${text}" />
+		<meta property="og:description" content="${body}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="${twitterCard}">
@@ -175,7 +179,7 @@ async function mainPage(
 		<meta property="twitter:creator" content="${post.blog_name}" />
 		<meta property="twitter:site" content="${post.blog.url}" />
 		<meta property="twitter:url" content="${post.post_url}" />
-		<meta property="twitter:description" content="${tags}${text}" />
+		<meta property="twitter:description" content="${body}" />
 
 		${videosToShow}
 		${imagesToShow}
