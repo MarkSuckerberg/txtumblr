@@ -147,7 +147,7 @@ async function mainPage(
 	const videosToShow = videoIndex ? videoTags[+videoIndex - 1] : videoTags.join('\n');
 
 	const title = `${post.blog.name} ${
-		originalPost ? `🔁 ${originalPost.blog.name}` : `(${post.blog.title})`
+		originalPost ? `🔁 ${originalPost.blog?.name || 'deleted blog'}` : `(${post.blog.title})`
 	}`;
 
 	const audioBlocks = blocks.filter(element => element.type == 'audio') as TumblrNeueAudioBlock[];
