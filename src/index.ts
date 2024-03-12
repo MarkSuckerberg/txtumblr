@@ -1,9 +1,9 @@
 import {
 	FetchPost,
 	GetNotes,
+	TumblrAPIError,
 	TumblrBlocksPost,
 	TumblrNeueAudioBlock,
-	TumblrNeueAudioBlockBase,
 	TumblrNeueImageBlock,
 	TumblrNeueTextBlock,
 	TumblrNeueVideoBlock,
@@ -48,7 +48,9 @@ export default {
 				true
 			);
 		} catch (error) {
-			return new Response('Error retrieving post', { status: 404 });
+			const tumblrUrl = new URL(`https://www.tumblr.com/${username}/${postID}`);
+
+			return errorPage(error, tumblrUrl);
 		}
 
 		const originalPost = post.trail[0] as TumblrBlocksPost;
@@ -206,6 +208,51 @@ async function mainPage(
 	return new Response(html, {
 		headers: {
 			'content-type': 'text/html;charset=UTF-8',
+		},
+	});
+}
+
+async function errorPage(error: unknown, url: URL) {
+	if (!(error instanceof TumblrAPIError)) {
+		return new Response('Unknown error fetching post', { status: 500 });
+	}
+
+	const errorDescription =
+		error.response.meta.status === 303
+			? "Login required to view this account's posts"
+			: error.response.meta.msg;
+
+	const html = `<!DOCTYPE html>
+	<head>
+		<title>txTumblr</title>
+		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}." />
+		<link rel="canonical" href="${url}" />
+		<!-- OpenGraph embed tags -->
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="txTumblr" />
+		<meta property="og:url" content="${url}" />
+		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}" />
+
+		<!-- Twitter embed tags -->
+		<meta name="twitter:card" content="summary">
+		<meta property="twitter:domain" content="tumblr.com">
+		<meta property="twitter:title" content="txTumblr" />
+		<meta property="twitter:url" content="${url}" />
+		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}" />
+
+		<meta http-equiv="refresh" content="0;url=${url}" />
+	</head>
+
+	<body>
+		<h1>Error ${error.response.meta.status}: ${error.response.meta.msg}</h1>
+		<p>${error.response.errors?.at(0)?.detail}</p>
+	</body>
+	`;
+
+	return new Response(html, {
+		headers: {
+			'content-type': 'text/html;charset=UTF-8',
+			'status': error.response.meta.status.toString(),
 		},
 	});
 }
