@@ -217,37 +217,31 @@ async function errorPage(error: unknown, url: URL) {
 		return new Response('Unknown error fetching post', { status: 500 });
 	}
 
-	const errorDescription =
-		error.response.meta.status === 303
-			? "Login required to view this account's posts"
-			: error.response.meta.msg;
+	const errorDetail = error.response.errors?.at(0)?.detail;
+	const errorDescription = error.response.meta.msg + (errorDetail ? `: ${errorDetail}` : '');
 
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>txTumblr</title>
-		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}." />
+		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
 		<link rel="canonical" href="${url}" />
 		<!-- OpenGraph embed tags -->
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="txTumblr" />
 		<meta property="og:url" content="${url}" />
-		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}" />
+		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="summary">
 		<meta property="twitter:domain" content="tumblr.com">
 		<meta property="twitter:title" content="txTumblr" />
 		<meta property="twitter:url" content="${url}" />
-		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error: ${errorDescription}" />
+		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
 
 		<meta http-equiv="refresh" content="0;url=${url}" />
-	</head>
 
-	<body>
-		<h1>Error ${error.response.meta.status}: ${error.response.meta.msg}</h1>
-		<p>${error.response.errors?.at(0)?.detail}</p>
-	</body>
-	`;
+		<meta property="theme-color" content="#aa5555" />
+	</head>`;
 
 	return new Response(html, {
 		headers: {
