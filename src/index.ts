@@ -202,7 +202,9 @@ async function mainPage(
 				: ''
 		}
 
-		<meta property="theme-color" content="#${imageBlocks.find(block => block.colors)?.colors?.c0}" />
+		<meta property="theme-color" content="#${
+			imageBlocks.find(block => block.colors)?.colors?.c0 || '5555aa'
+		}" />
 	</head>`;
 
 	return new Response(html, {
