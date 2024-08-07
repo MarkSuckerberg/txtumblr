@@ -12,5 +12,9 @@ routes = [
 	{ pattern = "txtumblr.suckerberg.gay", custom_domain = true }
 ]
 
+kv_namespaces = [
+	{ binding = "AUTH", id = "7f7518856e254c85af804c96c127f13b"}
+]
+
 [vars]
 TUMBLR_CONSUMER_KEY = "GmsefnPqQxQ8WawhwtYUx7cWUPW9SZFMppM9qKCha1VrLaJ2kp"

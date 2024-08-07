@@ -11,6 +11,8 @@ import {
 
 interface TumblrBotEnv {
 	TUMBLR_CONSUMER_KEY: string;
+	TUMBLR_CONSUMER_SECRET: string;
+	AUTH: KVNamespace;
 }
 
 export default {
@@ -22,6 +24,7 @@ export default {
 		const postID = trimmedPathInfo[1];
 
 		const consumerID = env.TUMBLR_CONSUMER_KEY;
+		const consumerSecret = env.TUMBLR_CONSUMER_SECRET;
 
 		if (!trimmedPathInfo.length) {
 			return Response.redirect('https://github.com/MarkSuckerberg/txtumblr', 301);
@@ -35,22 +38,39 @@ export default {
 			return new Response('No username provided', { status: 400 });
 		}
 
+		const refreshToken = await env.AUTH.get('refresh_token');
+
+		if (refreshToken) {
+			const data = await refreshTokenAuth(consumerID, consumerSecret, refreshToken);
+
+			if (data) {
+				await env.AUTH.put('access_token', data.access_token);
+				await env.AUTH.put('refresh_token', data.refresh_token!);
+			} else {
+				// Clear tokens if refresh fails, it will need to manually be re-added
+				await env.AUTH.delete('access_token');
+				await env.AUTH.delete('refresh_token');
+			}
+		}
+
+		const accessToken = await env.AUTH.get('access_token');
+
 		let post;
 		try {
 			post = await FetchPost<TumblrBlocksPost>(
-				consumerID,
+				accessToken || consumerID,
 				username,
 				postID,
 				false,
 				false,
 				undefined,
 				true,
-				true
+				!accessToken
 			);
 		} catch (error) {
 			const tumblrUrl = new URL(`https://www.tumblr.com/${username}/${postID}`);
 
-			return errorPage(error, tumblrUrl);
+			return errorPage(error, tumblrUrl, url);
 		}
 
 		const originalPost = post.trail[0] as TumblrBlocksPost;
@@ -214,9 +234,9 @@ async function mainPage(
 	});
 }
 
-async function errorPage(error: unknown, url: URL) {
+async function errorPage(error: unknown, postUrl: URL, url: URL) {
 	if (!(error instanceof TumblrAPIError)) {
-		return new Response('Unknown error fetching post', { status: 500 });
+		return new Response(`Error fetching post: ${error}`, { status: 500 });
 	}
 
 	const errorDetail = error.response.errors?.at(0)?.detail;
@@ -226,21 +246,25 @@ async function errorPage(error: unknown, url: URL) {
 	<head>
 		<title>txTumblr</title>
 		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
-		<link rel="canonical" href="${url}" />
+		<link rel="canonical" href="${postUrl}" />
 		<!-- OpenGraph embed tags -->
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="txTumblr" />
-		<meta property="og:url" content="${url}" />
+		<meta property="og:url" content="${postUrl}" />
 		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="summary">
 		<meta property="twitter:domain" content="tumblr.com">
 		<meta property="twitter:title" content="txTumblr" />
-		<meta property="twitter:url" content="${url}" />
+		<meta property="twitter:url" content="${postUrl}" />
 		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
 
-		<meta http-equiv="refresh" content="0;url=${url}" />
+		${
+			!url.searchParams.has('noRedirect')
+				? `<meta http-equiv="refresh" content="0;url=${postUrl}" />`
+				: ''
+		}
 
 		<meta property="theme-color" content="#aa5555" />
 	</head>`;
@@ -251,4 +275,36 @@ async function errorPage(error: unknown, url: URL) {
 			'status': error.response.meta.status.toString(),
 		},
 	});
+}
+
+async function refreshTokenAuth(consumerID: string, consumerSecret: string, refreshToken: string) {
+	const res = await fetch('https://api.tumblr.com/v2/oauth2/token', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Accept': 'application/json',
+			'User-Agent': 'Typeble-Auth/1.1.0',
+		},
+		body: JSON.stringify({
+			grant_type: 'refresh_token',
+			refresh_token: refreshToken,
+			client_id: consumerID,
+			client_secret: consumerSecret,
+		}),
+	});
+
+	if (!res.ok) {
+		console.log(await res.text());
+
+		return null;
+	}
+
+	return (await res.json()) as {
+		access_token: string;
+		expires_in: number;
+		token_type: string;
+		scope: string;
+		id_token: string;
+		refresh_token: string;
+	};
 }

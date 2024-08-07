@@ -1,7 +1,11 @@
 .DS_Store
 /node_modules
+/.wrangler
 *-lock.*
 *.lock
 *.log
+
+.dev.vars
+.env
 
 /dist
