@@ -39,21 +39,21 @@ export default {
 		}
 
 		const refreshToken = await env.AUTH.get('refresh_token');
+		let accessToken = undefined;
+		let tokenError = "";
 
 		if (refreshToken) {
 			const data = await refreshTokenAuth(consumerID, consumerSecret, refreshToken);
 
-			if (data) {
-				await env.AUTH.put('access_token', data.access_token);
+			if (typeof data === 'object') {
 				await env.AUTH.put('refresh_token', data.refresh_token!);
+				accessToken = data.access_token;
 			} else {
 				// Clear tokens if refresh fails, it will need to manually be re-added
-				await env.AUTH.delete('access_token');
-				await env.AUTH.delete('refresh_token');
+				tokenError = data;
+				await env.AUTH.put('access_token_error', data);
 			}
 		}
-
-		const accessToken = await env.AUTH.get('access_token');
 
 		let post;
 		try {
@@ -240,31 +240,32 @@ async function mainPage(
 	});
 }
 
-async function errorPage(error: unknown, postUrl: URL, url: URL) {
+async function errorPage(error: unknown, postUrl: URL, url: URL, extra?: string) {
 	if (!(error instanceof TumblrAPIError)) {
-		return new Response(`Error fetching post: ${error}`, { status: 500 });
+		return new Response(`Error fetching post: ${error}\n${extra}`, { status: 500 });
 	}
 
 	const errorDetail = error.response.errors?.at(0)?.detail;
 	const errorDescription = error.response.meta.msg + (errorDetail ? `: ${errorDetail}` : '');
+	const extraInfo = extra ? `\n${extra}` : '';
 
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>txTumblr</title>
-		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
+		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
 		<link rel="canonical" href="${postUrl}" />
 		<!-- OpenGraph embed tags -->
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="txTumblr" />
 		<meta property="og:url" content="${postUrl}" />
-		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
+		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="summary">
 		<meta property="twitter:domain" content="tumblr.com">
 		<meta property="twitter:title" content="txTumblr" />
 		<meta property="twitter:url" content="${postUrl}" />
-		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}" />
+		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
 
 		${
 			!url.searchParams.has('noRedirect')
@@ -300,9 +301,7 @@ async function refreshTokenAuth(consumerID: string, consumerSecret: string, refr
 	});
 
 	if (!res.ok) {
-		console.log(await res.text());
-
-		return null;
+		return res.text();
 	}
 
 	return (await res.json()) as {
