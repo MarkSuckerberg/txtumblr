@@ -40,7 +40,7 @@ export default {
 
 		const refreshToken = await env.AUTH.get('refresh_token');
 		let accessToken = undefined;
-		let tokenError = "";
+		let tokenError = '';
 
 		if (refreshToken) {
 			const data = await refreshTokenAuth(consumerID, consumerSecret, refreshToken);
@@ -76,7 +76,7 @@ export default {
 		const originalPost = post.trail[0] as TumblrBlocksPost;
 
 		if (url.searchParams.has('oembed')) {
-			return oembed(post, consumerID);
+			return oembed(post, consumerID, request.headers.get('accept-language') || undefined);
 		} else if (url.searchParams.has('json')) {
 			return json(post);
 		} else {
@@ -85,7 +85,7 @@ export default {
 	},
 };
 
-async function oembed(post: TumblrBlocksPost, consumerID: string) {
+async function oembed(post: TumblrBlocksPost, consumerID: string, locale?: string) {
 	const notes = await GetNotes(
 		consumerID,
 		post.blog.name,
@@ -100,8 +100,19 @@ async function oembed(post: TumblrBlocksPost, consumerID: string) {
 	if (!notes.total_reblogs) {
 		notes.total_reblogs = notes.notes.filter(note => note.type === 'reblog').length;
 	}
+
+	try {
+		locale = Intl.getCanonicalLocales(locale?.split(',')[0])[0];
+	} catch (err) {
+		locale = 'en';
+	}
+
+	const noteString = Intl.NumberFormat(locale).format(post.note_count);
+	const reblogString = Intl.NumberFormat(locale).format(notes.total_reblogs);
+	const likeString = Intl.NumberFormat(locale).format(notes.total_likes);
+
 	const response = {
-		author_name: `${post.note_count} 📝 | ${notes.total_reblogs} 🔁 | ${notes.total_likes} ❤️`,
+		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️`,
 		author_url: post.blog.url,
 		provider_name: 'txTumblr',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
@@ -112,7 +123,7 @@ async function oembed(post: TumblrBlocksPost, consumerID: string) {
 
 	return new Response(JSON.stringify(response), {
 		headers: {
-			'content-type': 'text/json;charset=UTF-8',
+			'content-type': 'application/json;charset=UTF-8',
 		},
 	});
 }
@@ -120,7 +131,7 @@ async function oembed(post: TumblrBlocksPost, consumerID: string) {
 async function json(post: TumblrBlocksPost) {
 	return new Response(JSON.stringify(post), {
 		headers: {
-			'content-type': 'text/json;charset=UTF-8',
+			'content-type': 'application/json;charset=UTF-8',
 		},
 	});
 }
@@ -130,13 +141,17 @@ async function mainPage(
 	originalPost: TumblrBlocksPost | undefined,
 	url: URL
 ) {
-	const trail = post.trail as TumblrBlocksPost[];
+	const blocks = post.content;
 
-	const blocks = post.content.concat(
-		trail.flatMap(trailPost => {
-			return trailPost.content;
-		})
-	);
+	if (!url.searchParams.has('noTrail')) {
+		const trail = post.trail as TumblrBlocksPost[];
+
+		blocks.concat(
+			trail.flatMap(trailPost => {
+				return trailPost.content;
+			})
+		);
+	}
 
 	const twitterCard =
 		blocks.find(element => element.type == 'image' || element.type == 'video')?.type == 'video'
@@ -186,8 +201,25 @@ async function mainPage(
 		audioUrl => `<meta property="og:audio" content="${audioUrl}" />`
 	);
 
+	const audioIndex = url.searchParams.get('audio');
+	const audioToShow = audioIndex ? audioUrls[+audioIndex - 1] : audioTags.join('\n');
+
 	const tags = post.tags.length ? `Tags: #${post.tags.join(' #')}\n` : '';
 	const body = `${tags}${text}`;
+
+	// For the old behaviour, simply do ?image&video&audio.
+	const values = [];
+	if (url.searchParams.has('video')) {
+		values.push(videosToShow);
+	}
+	if (url.searchParams.has('audio')) {
+		values.push(audioToShow);
+	}
+	if (url.searchParams.has('image')) {
+		values.push(imagesToShow);
+	}
+
+	const mediaToShow = values.join('\n') || videosToShow || audioToShow || imagesToShow;
 
 	const html = `<!DOCTYPE html>
 	<head>
@@ -211,9 +243,7 @@ async function mainPage(
 		<meta property="twitter:url" content="${post.post_url}" />
 		<meta property="twitter:description" content="${body}" />
 
-		${videosToShow}
-		${imagesToShow}
-		${audioTags}
+		${mediaToShow}
 
 		<link
 			rel="alternate"
