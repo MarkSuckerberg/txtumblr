@@ -141,17 +141,12 @@ async function mainPage(
 	originalPost: TumblrBlocksPost | undefined,
 	url: URL
 ) {
-	const blocks = post.content;
-
-	if (!url.searchParams.has('noTrail')) {
-		const trail = post.trail as TumblrBlocksPost[];
-
-		blocks.concat(
-			trail.flatMap(trailPost => {
-				return trailPost.content;
-			})
-		);
-	}
+	const trail = post.trail as TumblrBlocksPost[];
+	const blocks = post.content.concat(
+		trail.flatMap(trailPost => {
+			return trailPost.content;
+		})
+	);
 
 	const twitterCard =
 		blocks.find(element => element.type == 'image' || element.type == 'video')?.type == 'video'
