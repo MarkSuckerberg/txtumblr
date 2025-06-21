@@ -9,11 +9,11 @@ routes = [
 	{ pattern = "fxtumblr.stellers.gay", custom_domain = true },
 	{ pattern = "txtumblr.stellers.gay", custom_domain = true },
 	{ pattern = "fxtumblr.suckerberg.gay", custom_domain = true },
-	{ pattern = "txtumblr.suckerberg.gay", custom_domain = true }
+	{ pattern = "txtumblr.suckerberg.gay", custom_domain = true },
 ]
 
 kv_namespaces = [
-	{ binding = "AUTH", id = "7f7518856e254c85af804c96c127f13b"}
+	{ binding = "AUTH", id = "7f7518856e254c85af804c96c127f13b", preview_id = "ac49d0198cb344c483629c8b794b253d" },
 ]
 
 [vars]

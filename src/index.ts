@@ -20,6 +20,27 @@ export default {
 		const url = new URL(request.url);
 		const pathInfo = url.pathname.split('/');
 		const trimmedPathInfo = pathInfo.filter(string => string);
+
+		if (trimmedPathInfo[0] === 'oembed') {
+			const username = url.searchParams.get('username');
+			const postID = url.searchParams.get('post_id');
+			const blogUrl = url.searchParams.get('blog_url');
+			const embedType = url.searchParams.get('type') || 'link';
+
+			if (!username || !postID) {
+				return new Response('Missing username or post_id', { status: 400 });
+			}
+
+			return oembed(
+				username,
+				postID,
+				env.TUMBLR_CONSUMER_KEY,
+				request.headers.get('accept-language') || undefined,
+				blogUrl || `https://tumblr.com/${username}`,
+				embedType
+			);
+		}
+
 		const username = trimmedPathInfo[0];
 		const postID = trimmedPathInfo[1];
 
@@ -40,7 +61,6 @@ export default {
 
 		const refreshToken = await env.AUTH.get('refresh_token');
 		let accessToken = undefined;
-		let tokenError = '';
 
 		if (refreshToken) {
 			const data = await refreshTokenAuth(consumerID, consumerSecret, refreshToken);
@@ -49,9 +69,8 @@ export default {
 				await env.AUTH.put('refresh_token', data.refresh_token!);
 				accessToken = data.access_token;
 			} else {
-				// Clear tokens if refresh fails, it will need to manually be re-added
-				tokenError = data;
-				await env.AUTH.put('access_token_error', data);
+				const error = `Error refreshing access token: ${data} at ${new Date().toISOString()}`;
+				await env.AUTH.put('access_token_error', error);
 			}
 		}
 
@@ -76,7 +95,14 @@ export default {
 		const originalPost = post.trail[0] as TumblrBlocksPost;
 
 		if (url.searchParams.has('oembed')) {
-			return oembed(post, consumerID, request.headers.get('accept-language') || undefined);
+			return oembed(
+				post.blog.name,
+				post.id_string,
+				consumerID,
+				request.headers.get('accept-language') || undefined,
+				post.blog.url,
+				url.searchParams.get('type') || 'link'
+			);
 		} else if (url.searchParams.has('json')) {
 			return json(post);
 		} else {
@@ -85,15 +111,18 @@ export default {
 	},
 };
 
-async function oembed(post: TumblrBlocksPost, consumerID: string, locale?: string) {
-	const notes = await GetNotes(
-		consumerID,
-		post.blog.name,
-		post.id_string,
-		undefined,
-		'conversation',
-		true
-	);
+async function oembed(
+	blogName: string,
+	postID: string,
+	consumerID: string,
+	locale?: string,
+	blogUrl?: string,
+	embedType = 'link'
+) {
+	if (!blogUrl) {
+		blogUrl = `https://tumblr.com/${blogName}`;
+	}
+	const notes = await GetNotes(consumerID, blogName, postID, undefined, 'conversation', true);
 	if (!notes.total_likes) {
 		notes.total_likes = notes.notes.filter(note => note.type === 'like').length;
 	}
@@ -107,17 +136,17 @@ async function oembed(post: TumblrBlocksPost, consumerID: string, locale?: strin
 		locale = 'en';
 	}
 
-	const noteString = Intl.NumberFormat(locale).format(post.note_count);
+	const noteString = Intl.NumberFormat(locale).format(notes.total_notes);
 	const reblogString = Intl.NumberFormat(locale).format(notes.total_reblogs);
 	const likeString = Intl.NumberFormat(locale).format(notes.total_likes);
 
 	const response = {
 		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️`,
-		author_url: post.blog.url,
+		author_url: blogUrl,
 		provider_name: 'txTumblr',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
 		title: 'Tumblr',
-		type: 'link',
+		type: embedType,
 		version: '1.0',
 	};
 
@@ -156,7 +185,7 @@ async function mainPage(
 	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
 	const text = textBlocks
 		.map(block => block.text)
-		.join('\n\n')
+		.join('\n\n↱')
 		.replace(/"/g, '&quot;');
 
 	const imageBlocks = blocks.filter(element => element.type == 'image') as TumblrNeueImageBlock[];
@@ -216,6 +245,22 @@ async function mainPage(
 
 	const mediaToShow = values.join('\n') || videosToShow || audioToShow || imagesToShow;
 
+	const embedType =
+		videosToShow.length > 0
+			? 'video'
+			: audioToShow.length > 0
+			? 'audio'
+			: imagesToShow.length > 0
+			? 'photo'
+			: 'link';
+
+	const oembedParams = new URLSearchParams({
+		username: post.blog.name,
+		post_id: post.id_string,
+		blog_url: post.blog.url,
+		type: embedType,
+	});
+
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>
@@ -242,7 +287,8 @@ async function mainPage(
 
 		<link
 			rel="alternate"
-			href="${url.protocol}//${url.hostname}${url.pathname}?oembed"
+			href="${url.protocol}//${url.hostname}/oembed?${oembedParams.toString()}"
+	}"
 			type="application/json+oembed"
 			title="${post.blog_name}"
 		/>
