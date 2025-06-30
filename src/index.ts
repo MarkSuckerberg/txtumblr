@@ -185,6 +185,7 @@ async function mainPage(
 	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
 	const text = textBlocks
 		.map(block => block.text)
+		.filter(text => text.trim().length > 0)
 		.join('\n\n↱')
 		.replace(/"/g, '&quot;');
 
@@ -302,7 +303,10 @@ async function mainPage(
 		<meta property="theme-color" content="#${
 			imageBlocks.find(block => block.colors)?.colors?.c0 || '5555aa'
 		}" />
-	</head>`;
+	</head>
+	<body>
+		<p><a href="${post.post_url}">Click here if you are not redirected automatically...</a></p>
+	</body>`;
 
 	return new Response(html, {
 		headers: {
@@ -345,7 +349,10 @@ async function errorPage(error: unknown, postUrl: URL, url: URL, extra?: string)
 		}
 
 		<meta property="theme-color" content="#aa5555" />
-	</head>`;
+	</head>
+	<body>
+		<p><a href="${postUrl}">Click here if you are not redirected automatically...</a></p>
+	</body>`;
 
 	return new Response(html, {
 		headers: {
