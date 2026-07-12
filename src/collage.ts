@@ -1,6 +1,6 @@
 import * as JPEG from 'jpeg-js';
 import { decode } from 'fast-png';
-import { TumblrBlocksPost, TumblrNeueImageBlock } from 'typeble';
+import { TumblrBlocksPost } from 'typeble';
 
 export function get1DPosition2D(x: number, y: number, width: number) {
 	return (x % width) + y * width;
@@ -20,7 +20,7 @@ export async function collage(post: TumblrBlocksPost, ctx: ExecutionContext) {
 		})
 	);
 
-	const imageBlocks = blocks.filter(element => element.type == 'image') as TumblrNeueImageBlock[];
+	const imageBlocks = blocks.filter(element => element.type == 'image');
 
 	if (imageBlocks.length < 1) {
 		return new Response('post has no image', { status: 404 });
@@ -69,7 +69,7 @@ export async function collage(post: TumblrBlocksPost, ctx: ExecutionContext) {
 	const cols = 1 + Math.ceil(imageMediaObjects.length / 6);
 	const rows = Math.ceil(imageMediaObjects.length / cols);
 
-	let colHeights = new Array<number>(cols).fill(0);
+	const colHeights = new Array<number>(cols).fill(0);
 	imageMediaObjects.forEach((image, index) => {
 		const col = Math.floor(index / rows);
 

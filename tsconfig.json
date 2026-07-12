@@ -38,6 +38,6 @@
 		"skipLibCheck": true,
 		"types": ["./worker-configuration.d.ts", "node"]
 	},
-	"exclude": ["test"],
-	"include": ["worker-configuration.d.ts", "eslint.config.js", "src/**/*.ts", "test/index.spec.ts"]
+	"exclude": [],
+	"include": ["vitest.config.mts", "worker-configuration.d.ts", "eslint.config.js", "src/**/*.ts"]
 }

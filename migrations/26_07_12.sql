@@ -1,1 +1,0 @@
-CREATE TABLE IF NOT EXISTS RefreshTokens (Id INTEGER PRIMARY KEY, RetrievedTime TIMESTAMP, ExpiresTime TIMESTAMP, AccessToken TEXT, RefreshToken TEXT)

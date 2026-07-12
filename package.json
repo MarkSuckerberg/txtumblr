@@ -26,12 +26,12 @@
 		"@cloudflare/vitest-pool-workers": "^0.18.4",
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^26.1.1",
-		"eslint": "^10.6.0",
+		"eslint": "^10.7.0",
 		"eslint-config-prettier": "^10.1.8",
 		"prettier": "^3.9.5",
-		"typescript": "^7.0.2",
+		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.63.0",
-		"vitest": "^3.2.7",
+		"vitest": "^4.1.10",
 		"wrangler": "^4.110.0"
 	},
 	"dependencies": {

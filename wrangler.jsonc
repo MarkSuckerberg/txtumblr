@@ -6,7 +6,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "txtumblr",
 	"main": "src/index.ts",
-	"compatibility_date": "2026-07-08",
+	"compatibility_date": "2026-03-17",
 	"observability": {
 		"enabled": true,
 	},
@@ -27,13 +27,7 @@
 		{
 			"binding": "DB",
 			"database_id": "8e91d32c-af89-46ba-b101-905758b87e28",
-		},
-	],
-	"kv_namespaces": [
-		{
-			"binding": "AUTH",
-			"id": "7f7518856e254c85af804c96c127f13b",
-			"preview_id": "ac49d0198cb344c483629c8b794b253d",
+			"preview_database_id": "DB",
 		},
 	],
 	"workers_dev": true,

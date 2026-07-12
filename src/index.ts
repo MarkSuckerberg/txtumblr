@@ -4,8 +4,6 @@ import {
 	TumblrAPIError,
 	TumblrBlocksPost,
 	TumblrNeueAudioBlock,
-	TumblrNeueImageBlock,
-	TumblrNeueTextBlock,
 	TumblrNeueVideoBlock,
 } from 'typeble';
 import { collage } from './collage';
@@ -66,7 +64,7 @@ export default {
 			'SELECT *, expirestime < unixepoch() as Expired FROM refreshtokens ORDER BY RetrievedTime DESC LIMIT 1'
 		);
 		const dbResponse = await getToken.run<DBRefreshToken>();
-		let accessToken = undefined;
+		let accessToken: string | undefined = undefined;
 
 		for (const potentialToken of dbResponse.results) {
 			if (!potentialToken.Expired) {
@@ -99,7 +97,13 @@ export default {
 			);
 
 			if (typeof data === 'object') {
-				await setToken.bind(data.expires_in, data.access_token, data.refresh_token).run();
+				const setToken = env.DB.prepare(
+					'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
+				);
+
+				ctx.waitUntil(
+					setToken.bind(data.expires_in, data.access_token, data.refresh_token).run()
+				);
 			}
 		}
 
@@ -119,7 +123,7 @@ export default {
 		} catch (error) {
 			const tumblrUrl = new URL(`https://www.tumblr.com/${username}/${postID}`);
 
-			return errorPage(error, tumblrUrl, url);
+			return errorPage(error as Error, tumblrUrl.href, url);
 		}
 
 		const originalPost = post.trail[0] as TumblrBlocksPost;
@@ -164,7 +168,7 @@ async function oembed(
 
 	try {
 		locale = Intl.getCanonicalLocales(locale?.split(',')[0])[0];
-	} catch (err) {
+	} catch {
 		locale = 'en';
 	}
 
@@ -190,7 +194,7 @@ async function oembed(
 	});
 }
 
-async function json(post: TumblrBlocksPost) {
+function json(post: TumblrBlocksPost) {
 	return new Response(JSON.stringify(post), {
 		headers: {
 			'content-type': 'application/json;charset=UTF-8',
@@ -198,11 +202,7 @@ async function json(post: TumblrBlocksPost) {
 	});
 }
 
-async function mainPage(
-	post: TumblrBlocksPost,
-	originalPost: TumblrBlocksPost | undefined,
-	url: URL
-) {
+function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undefined, url: URL) {
 	const trail = post.trail as TumblrBlocksPost[];
 	const blocks = post.content.concat(
 		trail.flatMap(trailPost => {
@@ -215,14 +215,14 @@ async function mainPage(
 			? 'player'
 			: 'summary_large_image';
 
-	const textBlocks = blocks.filter(element => element.type == 'text') as TumblrNeueTextBlock[];
+	const textBlocks = blocks.filter(element => element.type == 'text');
 	const text = textBlocks
 		.map(block => block.text)
 		.filter(text => text.trim().length > 0)
 		.join('\n\n↱')
 		.replace(/"/g, '&quot;');
 
-	const imageBlocks = blocks.filter(element => element.type == 'image') as TumblrNeueImageBlock[];
+	const imageBlocks = blocks.filter(element => element.type == 'image');
 	const imageMediaObjects = imageBlocks.map(
 		block => block.media.find(media => media.has_original_dimensions) || block.media[0]
 	);
@@ -359,7 +359,7 @@ async function mainPage(
 	});
 }
 
-async function errorPage(error: unknown, postUrl: URL, url: URL, extra?: string) {
+function errorPage(error: Error, postUrl: string, url: URL, extra?: string) {
 	if (!(error instanceof TumblrAPIError)) {
 		return new Response(`Error fetching post: ${error}\n${extra}`, { status: 500 });
 	}
@@ -406,7 +406,20 @@ async function errorPage(error: unknown, postUrl: URL, url: URL, extra?: string)
 	});
 }
 
-async function refreshTokenAuth(consumerID: string, consumerSecret: string, refreshToken: string) {
+interface RefreshTokenResponse {
+	access_token: string;
+	expires_in: number;
+	token_type: string;
+	scope: string;
+	id_token: string;
+	refresh_token: string;
+}
+
+async function refreshTokenAuth(
+	consumerID: string,
+	consumerSecret: string,
+	refreshToken: string
+): Promise<string | RefreshTokenResponse> {
 	const res = await fetch('https://api.tumblr.com/v2/oauth2/token', {
 		method: 'POST',
 		headers: {
@@ -426,12 +439,5 @@ async function refreshTokenAuth(consumerID: string, consumerSecret: string, refr
 		return res.text();
 	}
 
-	return (await res.json()) as {
-		access_token: string;
-		expires_in: number;
-		token_type: string;
-		scope: string;
-		id_token: string;
-		refresh_token: string;
-	};
+	return await res.json();
 }
