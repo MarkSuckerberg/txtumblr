@@ -10,8 +10,6 @@ import {
 } from 'typeble';
 import { collage } from './collage';
 
-import { env } from 'cloudflare:workers';
-
 interface DBRefreshToken {
 	RetrievedTime: number;
 	ExpiresTime: number;
@@ -20,12 +18,6 @@ interface DBRefreshToken {
 	Expired?: boolean;
 }
 
-const getToken = env.DB.prepare(
-	'SELECT *, expirestime < unixepoch() as Expired FROM refreshtokens ORDER BY RetrievedTime DESC LIMIT 1'
-);
-const setToken = env.DB.prepare(
-	'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
-);
 export default {
 	async fetch(request: Request, env: Env, ctx) {
 		const url = new URL(request.url);
@@ -70,6 +62,9 @@ export default {
 			return new Response('No username provided', { status: 400 });
 		}
 
+		const getToken = env.DB.prepare(
+			'SELECT *, expirestime < unixepoch() as Expired FROM refreshtokens ORDER BY RetrievedTime DESC LIMIT 1'
+		);
 		const dbResponse = await getToken.run<DBRefreshToken>();
 		let accessToken = undefined;
 
@@ -86,6 +81,10 @@ export default {
 			);
 
 			if (typeof data === 'object') {
+				const setToken = env.DB.prepare(
+					'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
+				);
+
 				await setToken.bind(data.expires_in, data.access_token, data.refresh_token).run();
 				accessToken = data.access_token;
 				break;
