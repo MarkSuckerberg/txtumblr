@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env, createExecutionContext } from 'cloudflare:test';
 import worker from '../src/index';
 import { describe, expect, it } from 'vitest';
 
@@ -12,7 +12,9 @@ describe('Worker', () => {
 			'https://txtumblr.suckerberg.workers.dev/engineering/690135035533230080',
 			{ method: 'GET' }
 		);
-		const resp = await worker.fetch(req, env);
+
+		const ctx = createExecutionContext();
+		const resp = await worker.fetch(req, env, ctx);
 		expect(resp.status).toBe(200);
 
 		const text = await resp.text();
@@ -24,7 +26,8 @@ describe('Worker', () => {
 			'https://txtumblr.suckerberg.workers.dev/engineering/713599421825351680',
 			{ method: 'GET' }
 		);
-		const resp = await worker.fetch(req, env);
+		const ctx = createExecutionContext();
+		const resp = await worker.fetch(req, env, ctx);
 		expect(resp.status).toBe(200);
 
 		const text = await resp.text();

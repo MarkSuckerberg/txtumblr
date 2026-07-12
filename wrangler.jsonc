@@ -23,6 +23,12 @@
 	 * databases, object storage, AI inference, real-time communication and more.
 	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
 	 */
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_id": "8e91d32c-af89-46ba-b101-905758b87e28",
+		},
+	],
 	"kv_namespaces": [
 		{
 			"binding": "AUTH",
@@ -30,16 +36,32 @@
 			"preview_id": "ac49d0198cb344c483629c8b794b253d",
 		},
 	],
-
 	"workers_dev": true,
-
 	"routes": [
-		{ "pattern": "txtumblr.com", "custom_domain": true },
-		{ "pattern": "www.txtumblr.com", "custom_domain": true },
-		{ "pattern": "fxtumblr.stellers.gay", "custom_domain": true },
-		{ "pattern": "txtumblr.stellers.gay", "custom_domain": true },
-		{ "pattern": "fxtumblr.suckerberg.gay", "custom_domain": true },
-		{ "pattern": "txtumblr.suckerberg.gay", "custom_domain": true },
+		{
+			"pattern": "txtumblr.com",
+			"custom_domain": true,
+		},
+		{
+			"pattern": "www.txtumblr.com",
+			"custom_domain": true,
+		},
+		{
+			"pattern": "fxtumblr.stellers.gay",
+			"custom_domain": true,
+		},
+		{
+			"pattern": "txtumblr.stellers.gay",
+			"custom_domain": true,
+		},
+		{
+			"pattern": "fxtumblr.suckerberg.gay",
+			"custom_domain": true,
+		},
+		{
+			"pattern": "txtumblr.suckerberg.gay",
+			"custom_domain": true,
+		},
 	],
 	/**
 	 * Environment Variables
@@ -49,7 +71,11 @@
 	 */
 	// "vars": {  "MY_VARIABLE": "production_value" }
 	"secrets": {
-		"required": ["TUMBLR_CONSUMER_KEY", "TUMBLR_CONSUMER_SECRET"],
+		"required": [
+			"TUMBLR_CONSUMER_KEY",
+			"TUMBLR_CONSUMER_SECRET",
+			"TUMBLR_INITIAL_REFRESH_TOKEN",
+		],
 	},
 	/**
 	 * Static Assets

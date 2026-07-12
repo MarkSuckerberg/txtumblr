@@ -12,7 +12,7 @@ interface RawImage {
 	width: number;
 }
 
-export async function collage(post: TumblrBlocksPost) {
+export async function collage(post: TumblrBlocksPost, ctx: ExecutionContext) {
 	const trail = post.trail as TumblrBlocksPost[];
 	const blocks = post.content.concat(
 		trail.flatMap(trailPost => {
@@ -101,7 +101,7 @@ export async function collage(post: TumblrBlocksPost) {
 			const image = imageMediaObjects[imageIndex];
 
 			const req = (await caches.default.match(image.url)) || (await fetch(image.url));
-			caches.default.put(image.url, req.clone());
+			ctx.waitUntil(caches.default.put(image.url, req.clone()));
 
 			if (!req.ok) {
 				continue;

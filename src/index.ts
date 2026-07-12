@@ -10,8 +10,24 @@ import {
 } from 'typeble';
 import { collage } from './collage';
 
+import { env } from 'cloudflare:workers';
+
+interface DBRefreshToken {
+	RetrievedTime: number;
+	ExpiresTime: number;
+	AccessToken: string;
+	RefreshToken: string;
+	Expired?: boolean;
+}
+
+const getToken = env.DB.prepare(
+	'SELECT *, expirestime < unixepoch() as Expired FROM refreshtokens ORDER BY RetrievedTime DESC LIMIT 1'
+);
+const setToken = env.DB.prepare(
+	'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
+);
 export default {
-	async fetch(request: Request, env: Env) {
+	async fetch(request: Request, env: Env, ctx) {
 		const url = new URL(request.url);
 		const pathInfo = url.pathname.split('/');
 		const trimmedPathInfo = pathInfo.filter(string => string);
@@ -54,18 +70,37 @@ export default {
 			return new Response('No username provided', { status: 400 });
 		}
 
-		const refreshToken = await env.AUTH.get('refresh_token');
+		const dbResponse = await getToken.run<DBRefreshToken>();
 		let accessToken = undefined;
 
-		if (refreshToken) {
-			const data = await refreshTokenAuth(consumerID, consumerSecret, refreshToken);
+		for (const potentialToken of dbResponse.results) {
+			if (!potentialToken.Expired) {
+				accessToken = potentialToken.AccessToken;
+				break;
+			}
+
+			const data = await refreshTokenAuth(
+				consumerID,
+				consumerSecret,
+				potentialToken.RefreshToken
+			);
 
 			if (typeof data === 'object') {
-				await env.AUTH.put('refresh_token', data.refresh_token!);
+				await setToken.bind(data.expires_in, data.access_token, data.refresh_token).run();
 				accessToken = data.access_token;
-			} else {
-				const error = `Error refreshing access token: ${data} at ${new Date().toISOString()}`;
-				await env.AUTH.put('access_token_error', error);
+				break;
+			}
+		}
+
+		if (!accessToken) {
+			const data = await refreshTokenAuth(
+				consumerID,
+				consumerSecret,
+				env.TUMBLR_INITIAL_REFRESH_TOKEN
+			);
+
+			if (typeof data === 'object') {
+				await setToken.bind(data.expires_in, data.access_token, data.refresh_token).run();
 			}
 		}
 
@@ -100,14 +135,14 @@ export default {
 				url.searchParams.get('type') || 'link'
 			);
 		} else if (url.searchParams.has('collage')) {
-			return collage(post);
+			return collage(post, ctx);
 		} else if (url.searchParams.has('json')) {
 			return json(post);
 		} else {
 			return mainPage(post, originalPost, url);
 		}
 	},
-};
+} satisfies ExportedHandler<Env>;
 
 async function oembed(
 	blogName: string,
@@ -265,7 +300,7 @@ async function mainPage(
 	collageUrl.search = 'collage';
 
 	const collage =
-		embedType == 'photo' && imagesToShow.length > 1
+		embedType == 'photo' && imageTags.length > 1
 			? `<meta property="og:image" content="${collageUrl.href}" />`
 			: '';
 
