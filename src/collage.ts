@@ -26,35 +26,43 @@ export async function collage(post: TumblrBlocksPost) {
 		return new Response('post has no image', { status: 404 });
 	}
 	if (imageBlocks.length < 2) {
-		return fetch(
-			imageBlocks[0].media.find(media => media.has_original_dimensions)?.url ||
-				imageBlocks[0].media[0].url
-		);
+		return new Response('pointless to collage, only one image', { status: 404 });
 	}
 
 	const bgColorStr = (imageBlocks.find(block => block.colors?.c0)?.colors!.c0 || '888888') + '00';
 
 	const possibleWidths = imageBlocks[0].media.map(media => media.width);
 
-	let matchingWidth = possibleWidths.find(current =>
-		imageBlocks.every(value =>
-			value.media.find(
-				media =>
-					(media.type == 'image/png' || media.type == 'image/jpeg') &&
-					media.width &&
-					media.width <= 640 &&
-					media.width == current
-			)
-		)
+	const widths = new Array<number>(possibleWidths.length);
+	let matchingWidth = possibleWidths.find((current, widthIndex) =>
+		imageBlocks.every((value, blockIndex) => {
+			if (
+				value.media.find(
+					media => media.width && media.width <= 500 && media.width == current
+				)
+			) {
+				return true;
+			}
+
+			//Set the highest index this particular width got
+			widths[widthIndex] = blockIndex;
+			return false;
+		})
 	);
 
 	if (!matchingWidth) {
-		matchingWidth = possibleWidths[0] || 512;
+		//Use the most largest (ish) most commonly found width, or just 250 if all else fails.
+		matchingWidth = possibleWidths.at(widths.indexOf(Math.max(...widths))) || 250;
 	}
 
-	const imageMediaObjects = imageBlocks.map(
-		block => block.media.find(media => media.width == matchingWidth) || block.media[0]
-	);
+	const imageMediaObjects = imageBlocks
+		.map(block => block.media.find(media => media.width == matchingWidth))
+		.filter(media => media != undefined)
+		.filter(media => media.type == 'image/png' || media.type == 'image/jpeg');
+
+	if (imageMediaObjects.length < 2) {
+		return new Response('Not enough images of the same crop width', { status: 404 });
+	}
 
 	const maxMemory = 64 / imageMediaObjects.length;
 

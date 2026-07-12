@@ -141,7 +141,7 @@ async function oembed(
 	const response = {
 		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️`,
 		author_url: blogUrl,
-		provider_name: 'txTumblr - now with collages!',
+		provider_name: 'txTumblr - now with collages! (ironing out bugs bear with me)',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
 		title: 'Tumblr',
 		type: embedType,
@@ -193,19 +193,13 @@ async function mainPage(
 		block => block.media.find(media => media.has_original_dimensions) || block.media[0]
 	);
 
-	const collageUrl = new URL(url);
-	collageUrl.search = 'collage';
-
-	const imageTags = [
-		`<meta property="og:image" content="${collageUrl.href}" />`,
-		...imageMediaObjects.map(
-			mediaObject =>
-				`<meta property="og:image" content="${mediaObject.url}" />
+	const imageTags = imageMediaObjects.map(
+		mediaObject =>
+			`<meta property="og:image" content="${mediaObject.url}" />
 				<meta property="og:image-height" content="${mediaObject.height}" />
 				<meta property="og:image-width" content="${mediaObject.width}" />
 				<meta property="twitter:image" content="${mediaObject.url}" />`
-		),
-	];
+	);
 
 	const imageIndex = url.searchParams.get('image');
 	const imagesToShow = imageIndex ? imageTags[+imageIndex - 1] : imageTags.join('\n');
@@ -267,6 +261,14 @@ async function mainPage(
 		type: embedType,
 	});
 
+	const collageUrl = new URL(url);
+	collageUrl.search = 'collage';
+
+	const collage =
+		embedType == 'photo' && imagesToShow.length > 1
+			? `<meta property="og:image" content="${collageUrl.href}" />`
+			: '';
+
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>${title}</title>
@@ -288,6 +290,8 @@ async function mainPage(
 		<meta property="twitter:site" content="${post.blog.url}" />
 		<meta property="twitter:url" content="${post.post_url}" />
 		<meta property="twitter:description" content="${body}" />
+
+		${collage}
 
 		${mediaToShow}
 
@@ -374,7 +378,7 @@ async function refreshTokenAuth(consumerID: string, consumerSecret: string, refr
 		headers: {
 			'Content-Type': 'application/json',
 			'Accept': 'application/json',
-			'User-Agent': 'Typeble-Auth/1.1.0',
+			'User-Agent': 'txtumblr/2.0.0',
 		},
 		body: JSON.stringify({
 			grant_type: 'refresh_token',
