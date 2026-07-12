@@ -7,7 +7,10 @@
 	"scripts": {
 		"deploy": "wrangler deploy src/index.ts",
 		"dev": "wrangler dev src/index.ts",
-		"test": "vitest run"
+		"test": "vitest run",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint .",
+		"gen": "wrangler types"
 	},
 	"keywords": [
 		"tumblr",
@@ -20,12 +23,19 @@
 		"url": "https://ko-fi.com/marksuckerberg"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20230518.0 ",
-		"vitest": "^3.2.4",
-		"wrangler": "^4.20.5"
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^26.1.1",
+		"eslint": "^10.6.0",
+		"eslint-config-prettier": "^10.1.8",
+		"prettier": "^3.9.5",
+		"typescript": "^7.0.2",
+		"typescript-eslint": "^8.63.0",
+		"vitest": "^3.2.7",
+		"wrangler": "^4.110.0"
 	},
 	"dependencies": {
-		"typeble": "^0.5.0"
+		"jpeg-js": "^0.4.4",
+		"typeble": "^1.1.1"
 	},
 	"homepage": "https://github.com/MarkSuckerberg/typeble",
 	"bugs": {

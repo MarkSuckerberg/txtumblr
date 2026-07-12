@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+  skia-canvas: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - typeble@1.1.1

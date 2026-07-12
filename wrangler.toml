@@ -1,7 +1,8 @@
 name = "txtumblr"
 main = "./src/index.ts"
-compatibility_date = "2022-05-03"
+compatibility_date = "2026-05-03"
 workers_dev = true
+compatibility_flags = ["nodejs_compat"]
 
 routes = [
 	{ pattern = "txtumblr.com", custom_domain = true },

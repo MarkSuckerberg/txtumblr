@@ -8,6 +8,7 @@ import {
 	TumblrNeueTextBlock,
 	TumblrNeueVideoBlock,
 } from 'typeble';
+import { collage } from './collage';
 
 interface TumblrBotEnv {
 	TUMBLR_CONSUMER_KEY: string;
@@ -74,7 +75,7 @@ export default {
 			}
 		}
 
-		let post;
+		let post: TumblrBlocksPost;
 		try {
 			post = await FetchPost<TumblrBlocksPost>(
 				accessToken || consumerID,
@@ -84,7 +85,8 @@ export default {
 				false,
 				undefined,
 				true,
-				!accessToken
+				!accessToken,
+				caches.default
 			);
 		} catch (error) {
 			const tumblrUrl = new URL(`https://www.tumblr.com/${username}/${postID}`);
@@ -103,6 +105,8 @@ export default {
 				post.blog.url,
 				url.searchParams.get('type') || 'link'
 			);
+		} else if (url.searchParams.has('collage')) {
+			return collage(post);
 		} else if (url.searchParams.has('json')) {
 			return json(post);
 		} else {
@@ -143,7 +147,7 @@ async function oembed(
 	const response = {
 		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️`,
 		author_url: blogUrl,
-		provider_name: 'txTumblr',
+		provider_name: 'txTumblr - now with collages!',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
 		title: 'Tumblr',
 		type: embedType,
@@ -152,7 +156,8 @@ async function oembed(
 
 	return new Response(JSON.stringify(response), {
 		headers: {
-			'content-type': 'application/json;charset=UTF-8',
+			'Content-Type': 'application/json;charset=UTF-8',
+			'Cache-Control': 'public, max-age=3600, stale-while-revalidate=300',
 		},
 	});
 }
@@ -194,13 +199,19 @@ async function mainPage(
 		block => block.media.find(media => media.has_original_dimensions) || block.media[0]
 	);
 
-	const imageTags = imageMediaObjects.map(
-		mediaObject =>
-			`<meta property="og:image" content="${mediaObject.url}" />
+	const collageUrl = new URL(url);
+	collageUrl.search = 'collage';
+
+	const imageTags = [
+		`<meta property="og:image" content="${collageUrl.href}" />`,
+		...imageMediaObjects.map(
+			mediaObject =>
+				`<meta property="og:image" content="${mediaObject.url}" />
 				<meta property="og:image-height" content="${mediaObject.height}" />
 				<meta property="og:image-width" content="${mediaObject.width}" />
 				<meta property="twitter:image" content="${mediaObject.url}" />`
-	);
+		),
+	];
 
 	const imageIndex = url.searchParams.get('image');
 	const imagesToShow = imageIndex ? imageTags[+imageIndex - 1] : imageTags.join('\n');
@@ -250,10 +261,10 @@ async function mainPage(
 		videosToShow.length > 0
 			? 'video'
 			: audioToShow.length > 0
-			? 'audio'
-			: imagesToShow.length > 0
-			? 'photo'
-			: 'link';
+				? 'audio'
+				: imagesToShow.length > 0
+					? 'photo'
+					: 'link';
 
 	const oembedParams = new URLSearchParams({
 		username: post.blog.name,
@@ -310,7 +321,8 @@ async function mainPage(
 
 	return new Response(html, {
 		headers: {
-			'content-type': 'text/html;charset=UTF-8',
+			'Content-Type': 'text/html;charset=UTF-8',
+			'Cache-Control': 'public, max-age=604800, stale-while-revalidate=600',
 		},
 	});
 }
