@@ -1,8 +1,15 @@
 import * as JPEG from 'jpeg-js';
+import { decode } from 'fast-png';
 import { TumblrBlocksPost, TumblrNeueImageBlock } from 'typeble';
 
 export function get1DPosition2D(x: number, y: number, width: number) {
 	return (x % width) + y * width;
+}
+
+interface RawImage {
+	data: Buffer;
+	height: number;
+	width: number;
 }
 
 export async function collage(post: TumblrBlocksPost) {
@@ -31,7 +38,13 @@ export async function collage(post: TumblrBlocksPost) {
 
 	let matchingWidth = possibleWidths.find(current =>
 		imageBlocks.every(value =>
-			value.media.find(media => media.width && media.width <= 512 && media.width == current)
+			value.media.find(
+				media =>
+					(media.type == 'image/png' || media.type == 'image/jpeg') &&
+					media.width &&
+					media.width <= 640 &&
+					media.width == current
+			)
 		)
 	);
 
@@ -88,10 +101,20 @@ export async function collage(post: TumblrBlocksPost) {
 
 			try {
 				const inBuf = await req.arrayBuffer();
+				let data: RawImage;
 
-				const data = JPEG.decode(inBuf, {
-					maxMemoryUsageInMB: maxMemory,
-				});
+				if (image.type == 'image/jpeg') {
+					data = JPEG.decode(inBuf, {
+						maxMemoryUsageInMB: maxMemory,
+					});
+				} else {
+					const pngData = decode(inBuf);
+					data = {
+						height: pngData.height,
+						width: pngData.width,
+						data: Buffer.from(pngData.data.buffer),
+					};
+				}
 
 				const offsetX = Math.round((matchingWidth - data.width) / 2);
 				for (let index = 0; index < height; index++) {

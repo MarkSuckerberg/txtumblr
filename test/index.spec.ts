@@ -1,24 +1,18 @@
-import { unstable_dev } from 'wrangler';
-import type { UnstableDevWorker } from 'wrangler';
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { env } from 'cloudflare:workers';
+import worker from '../src/index';
+import { describe, expect, it } from 'vitest';
+
+// For now, you'll need to do something like this to get a correctly-typed
+// `Request` to pass to `worker.fetch()`.
+const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 describe('Worker', () => {
-	let worker: UnstableDevWorker;
-
-	beforeAll(async () => {
-		worker = await unstable_dev('src/index.ts');
-	});
-
-	afterAll(async () => {
-		await worker.stop();
-	});
-
 	it('should return 200 response with a text opengraph tag', async () => {
-		const req = new Request(
+		const req = new IncomingRequest(
 			'https://txtumblr.suckerberg.workers.dev/engineering/690135035533230080',
 			{ method: 'GET' }
 		);
-		const resp = await worker.fetch(req.url);
+		const resp = await worker.fetch(req, env);
 		expect(resp.status).toBe(200);
 
 		const text = await resp.text();
@@ -26,11 +20,11 @@ describe('Worker', () => {
 	});
 
 	it('should return 200 response with an image opengraph tag', async () => {
-		const req = new Request(
+		const req = new IncomingRequest(
 			'https://txtumblr.suckerberg.workers.dev/engineering/713599421825351680',
 			{ method: 'GET' }
 		);
-		const resp = await worker.fetch(req.url);
+		const resp = await worker.fetch(req, env);
 		expect(resp.status).toBe(200);
 
 		const text = await resp.text();

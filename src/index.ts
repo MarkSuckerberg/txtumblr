@@ -10,14 +10,8 @@ import {
 } from 'typeble';
 import { collage } from './collage';
 
-interface TumblrBotEnv {
-	TUMBLR_CONSUMER_KEY: string;
-	TUMBLR_CONSUMER_SECRET: string;
-	AUTH: KVNamespace;
-}
-
 export default {
-	async fetch(request: Request, env: TumblrBotEnv) {
+	async fetch(request: Request, env: Env) {
 		const url = new URL(request.url);
 		const pathInfo = url.pathname.split('/');
 		const trimmedPathInfo = pathInfo.filter(string => string);

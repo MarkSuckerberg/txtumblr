@@ -7,7 +7,7 @@
 	"scripts": {
 		"deploy": "wrangler deploy src/index.ts",
 		"dev": "wrangler dev src/index.ts",
-		"test": "vitest run",
+		"test": "vitest",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"gen": "wrangler types"
@@ -23,6 +23,7 @@
 		"url": "https://ko-fi.com/marksuckerberg"
 	},
 	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.18.4",
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^26.1.1",
 		"eslint": "^10.6.0",
@@ -34,6 +35,7 @@
 		"wrangler": "^4.110.0"
 	},
 	"dependencies": {
+		"fast-png": "^8.0.0",
 		"jpeg-js": "^0.4.4",
 		"typeble": "^1.1.1"
 	},
