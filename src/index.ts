@@ -4,70 +4,132 @@ import {
 	TumblrAPIError,
 	TumblrBlocksPost,
 	TumblrNeueAudioBlock,
+	TumblrNeueImageBlock,
 	TumblrNeueVideoBlock,
 } from 'typeble';
 import { collage } from './collage';
+import { DBRefreshToken, txTumblrError, txtumblrVersion } from './types';
 
-interface DBRefreshToken {
-	RetrievedTime: number;
-	ExpiresTime: number;
-	AccessToken: string;
-	RefreshToken: string;
-	Expired?: boolean;
-}
+const allow = 'GET, HEAD, OPTIONS, DELETE';
+let currentToken: DBRefreshToken | undefined;
 
-export default {
-	async fetch(request: Request, env: Env, ctx) {
-		const url = new URL(request.url);
-		const pathInfo = url.pathname.split('/');
-		const trimmedPathInfo = pathInfo.filter(string => string);
-
-		if (trimmedPathInfo[0] === 'oembed') {
-			const username = url.searchParams.get('username');
-			const postID = url.searchParams.get('post_id');
-			const blogUrl = url.searchParams.get('blog_url');
-			const embedType = url.searchParams.get('type') || 'link';
-
-			if (!username || !postID) {
-				return new Response('Missing username or post_id', { status: 400 });
+async function main(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	switch (request.method) {
+		case 'GET':
+		case 'HEAD':
+			break;
+		case 'OPTIONS':
+			return new Response(allow, { status: 200, headers: { Allow: allow } });
+		case 'DELETE':
+			if (request.headers.get('Authorization') != `Basic ${env.CACHE_CLEAR_TOKEN}`) {
+				return new Response('Unauthorized', {
+					status: 401,
+					headers: {
+						'WWW-Authenticate': 'realm="txtumblr", charset="UTF-8"',
+					},
+				});
 			}
+			break;
+		default:
+			return new Response(`Method ${request.method} not allowed`, {
+				status: 405,
+				headers: { Allow: allow },
+			});
+	}
 
-			return oembed(
-				username,
-				postID,
-				env.TUMBLR_CONSUMER_KEY,
-				request.headers.get('accept-language') || undefined,
-				blogUrl || `https://tumblr.com/${username}`,
-				embedType
-			);
+	const url = new URL(request.url);
+
+	//special dumb favicon handling. I probably shouldn't care but shrug
+	if (url.pathname == '/favicon.ico') {
+		const referer = request.headers.get('referer');
+		if (!referer) {
+			return new Response(null, { status: 404 });
 		}
 
-		const username = trimmedPathInfo[0];
-		const postID = trimmedPathInfo[1];
+		const newUrl = new URL(referer);
 
-		const consumerID = env.TUMBLR_CONSUMER_KEY;
-		const consumerSecret = env.TUMBLR_CONSUMER_SECRET;
+		url.pathname = newUrl.pathname;
+		url.search = '?favico';
+	}
 
-		if (!trimmedPathInfo.length) {
-			return Response.redirect('https://github.com/MarkSuckerberg/txtumblr', 301);
+	const pathInfo = url.pathname.split('/');
+	const trimmedPathInfo = pathInfo.filter(string => string);
+
+	if (trimmedPathInfo[0] === 'oembed') {
+		const username = url.searchParams.get('username');
+		const postID = url.searchParams.get('post_id');
+		const blogUrl = url.searchParams.get('blog_url');
+		const embedType = url.searchParams.get('type') || 'link';
+		const postTime = url.searchParams.get('post_time');
+		const format = url.searchParams.get('format');
+
+		if (!username || !postID) {
+			return new Response('Missing username or post_id', { status: 400 });
 		}
 
-		if (!Number.isInteger(+postID)) {
-			return new Response('Bad post ID', { status: 400 });
-		}
+		return oembed(
+			username,
+			postID,
+			env.TUMBLR_CONSUMER_KEY,
+			request.headers.get('accept-language'),
+			blogUrl || `https://tumblr.com/${username}`,
+			embedType,
+			postTime ? +postTime : undefined,
+			format
+		);
+	}
 
-		if (!username) {
-			return new Response('No username provided', { status: 400 });
-		}
+	const username = trimmedPathInfo[0];
+	const postID = trimmedPathInfo[1];
 
+	const consumerID = env.TUMBLR_CONSUMER_KEY;
+	const consumerSecret = env.TUMBLR_CONSUMER_SECRET;
+
+	if (!trimmedPathInfo.length) {
+		return Response.redirect('https://github.com/MarkSuckerberg/txtumblr', 301);
+	}
+
+	if (!Number.isInteger(+postID)) {
+		throw new txTumblrError('Bad post ID', 400, false);
+	}
+
+	if (!username) {
+		throw new txTumblrError('No username provided', 400, false);
+	}
+
+	const canonical = new URL(
+		`${url.protocol}//${url.hostname}/${username}/${postID}${url.search}`
+	);
+
+	if (request.method == 'DELETE') {
+		if (await caches.default.delete(canonical)) {
+			return new Response(null, { status: 204 });
+		} else {
+			return new Response('Not cached', { status: 404 });
+		}
+	}
+
+	const cached = await caches.default.match(canonical);
+
+	if (cached && env.CACHE_CLEAR_TOKEN) {
+		return cached;
+	}
+
+	let accessToken: string | undefined = undefined;
+
+	if (currentToken && currentToken.ExpiresTime > Date.now()) {
+		accessToken = currentToken.AccessToken;
+	}
+
+	try {
 		const getToken = env.DB.prepare(
 			'SELECT *, expirestime < unixepoch() as Expired FROM refreshtokens ORDER BY RetrievedTime DESC LIMIT 1'
 		);
 		const dbResponse = await getToken.run<DBRefreshToken>();
-		let accessToken: string | undefined = undefined;
 
 		for (const potentialToken of dbResponse.results) {
 			if (!potentialToken.Expired) {
+				currentToken = potentialToken;
 				accessToken = potentialToken.AccessToken;
 				break;
 			}
@@ -80,11 +142,17 @@ export default {
 
 			if (typeof data === 'object') {
 				const setToken = env.DB.prepare(
-					'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
+					'DELETE FROM refreshtokens; INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?, ?, ?)'
 				);
 
 				await setToken.bind(data.expires_in, data.access_token, data.refresh_token).run();
 				accessToken = data.access_token;
+				currentToken = {
+					RetrievedTime: Date.now(),
+					ExpiresTime: Date.now() + data.expires_in,
+					AccessToken: data.access_token,
+					RefreshToken: data.refresh_token,
+				};
 				break;
 			}
 		}
@@ -98,7 +166,7 @@ export default {
 
 			if (typeof data === 'object') {
 				const setToken = env.DB.prepare(
-					'INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?0, ?1, ?2); DELETE FROM refreshtokens WHERE RefreshToken != ?'
+					'DELETE FROM refreshtokens; INSERT INTO refreshtokens (RetrievedTime, ExpiresTime, AccessToken, RefreshToken) VALUES (unixepoch(), unixepoch() + ?, ?, ?);'
 				);
 
 				ctx.waitUntil(
@@ -106,43 +174,77 @@ export default {
 				);
 			}
 		}
+	} catch (error) {
+		console.error(error);
+	}
 
-		let post: TumblrBlocksPost;
-		try {
-			post = await FetchPost<TumblrBlocksPost>(
-				accessToken || consumerID,
-				username,
-				postID,
-				false,
-				false,
-				undefined,
-				true,
-				!accessToken,
-				caches.default
-			);
-		} catch (error) {
-			const tumblrUrl = new URL(`https://www.tumblr.com/${username}/${postID}`);
+	let post: TumblrBlocksPost;
+	try {
+		post = await FetchPost<TumblrBlocksPost>(
+			accessToken || consumerID,
+			username,
+			postID,
+			false,
+			false,
+			undefined,
+			true,
+			!accessToken,
+			caches.default
+		);
+	} catch (error) {
+		if (error instanceof TumblrAPIError) {
+			const errorDetail = 'Tumblr API: ' + error.response.errors?.at(0)?.detail;
+			const errorDescription =
+				error.response.meta.msg + (errorDetail ? `: ${errorDetail}` : '');
 
-			return errorPage(error as Error, tumblrUrl.href, url);
+			throw new txTumblrError(errorDescription, error.response.meta.status);
 		}
 
-		const originalPost = post.trail[0] as TumblrBlocksPost;
+		throw error;
+	}
 
-		if (url.searchParams.has('oembed')) {
-			return oembed(
-				post.blog.name,
-				post.id_string,
-				consumerID,
-				request.headers.get('accept-language') || undefined,
-				post.blog.url,
-				url.searchParams.get('type') || 'link'
-			);
-		} else if (url.searchParams.has('collage')) {
-			return collage(post, ctx);
-		} else if (url.searchParams.has('json')) {
-			return json(post);
-		} else {
-			return mainPage(post, originalPost, url);
+	const originalPost = post.trail[0] as TumblrBlocksPost;
+
+	let response: Response;
+
+	if (url.searchParams.has('oembed')) {
+		response = await oembed(
+			post.blog.name,
+			post.id_string,
+			consumerID,
+			request.headers.get('accept-language') || undefined,
+			post.blog.url,
+			url.searchParams.get('type') || 'link',
+			post.timestamp,
+			url.searchParams.get('format')
+		);
+	} else if (url.searchParams.has('collage')) {
+		response = await collage(post, ctx, url.searchParams);
+	} else if (url.searchParams.has('json')) {
+		response = json(post);
+	} else if (url.searchParams.has('favico')) {
+		response = await favico(post, request);
+	} else {
+		response = mainPage(post, originalPost, url);
+	}
+
+	ctx.waitUntil(caches.default.put(canonical, response.clone()));
+
+	return response;
+}
+
+export default {
+	async fetch(request: Request, env: Env, ctx) {
+		try {
+			return await main(request, env, ctx);
+		} catch (err) {
+			if (err instanceof txTumblrError) {
+				return errorPage(err.message, new URL(request.url), err.status, err.redirect);
+			}
+
+			const message = `Internal server error. This one's on me. ${err as string}`;
+
+			return errorPage(message, new URL(request.url), 500, false);
 		}
 	},
 } satisfies ExportedHandler<Env>;
@@ -151,10 +253,16 @@ async function oembed(
 	blogName: string,
 	postID: string,
 	consumerID: string,
-	locale?: string,
-	blogUrl?: string,
-	embedType = 'link'
+	locale?: string | null,
+	blogUrl?: string | null,
+	embedType = 'link',
+	postTime?: number | null,
+	format?: string | null
 ) {
+	if (format == 'xml') {
+		return new Response(null, { status: 501 });
+	}
+
 	if (!blogUrl) {
 		blogUrl = `https://tumblr.com/${blogName}`;
 	}
@@ -175,11 +283,14 @@ async function oembed(
 	const noteString = Intl.NumberFormat(locale).format(notes.total_notes);
 	const reblogString = Intl.NumberFormat(locale).format(notes.total_reblogs);
 	const likeString = Intl.NumberFormat(locale).format(notes.total_likes);
+	const dateString = postTime
+		? ` | ${Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(postTime * 1000)}`
+		: '';
 
 	const response = {
-		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️`,
+		author_name: `${noteString} 📝 | ${reblogString} 🔁 | ${likeString} ❤️${dateString}`,
 		author_url: blogUrl,
-		provider_name: 'txTumblr - now with collages! (ironing out bugs bear with me)',
+		provider_name: 'txTumblr - now with collages!',
 		provider_url: 'https://github.com/MarkSuckerberg/txtumblr',
 		title: 'Tumblr',
 		type: embedType,
@@ -190,8 +301,35 @@ async function oembed(
 		headers: {
 			'Content-Type': 'application/json;charset=UTF-8',
 			'Cache-Control': 'public, max-age=3600, stale-while-revalidate=300',
+			'Vary': 'Accept-Language',
 		},
 	});
+}
+
+async function favico(post: TumblrBlocksPost, req: Request) {
+	if (!('avatar' in post.blog)) {
+		return new Response(null, { status: 404 });
+	}
+
+	const avatar = post.blog.avatar as { width: number; height: number; url: string }[];
+	const smallestAvatar = avatar.at(-1);
+
+	if (!smallestAvatar) {
+		return new Response(null, { status: 404 });
+	}
+
+	const ourReq = new Request(smallestAvatar.url, {
+		...req,
+		headers: {
+			'Accept': req.headers.get('Accept') || 'image/png',
+			'Accept-Encoding': req.headers.get('Accept-Encoding') || 'br, gzip',
+			'User-Agent': txtumblrVersion,
+		},
+	});
+
+	const resp = (await caches.default.match(ourReq)) || (await fetch(ourReq));
+
+	return resp;
 }
 
 function json(post: TumblrBlocksPost) {
@@ -223,17 +361,7 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 		.replace(/"/g, '&quot;');
 
 	const imageBlocks = blocks.filter(element => element.type == 'image');
-	const imageMediaObjects = imageBlocks.map(
-		block => block.media.find(media => media.has_original_dimensions) || block.media[0]
-	);
-
-	const imageTags = imageMediaObjects.map(
-		mediaObject =>
-			`<meta property="og:image" content="${mediaObject.url}" />
-				<meta property="og:image-height" content="${mediaObject.height}" />
-				<meta property="og:image-width" content="${mediaObject.width}" />
-				<meta property="twitter:image" content="${mediaObject.url}" />`
-	);
+	const imageTags = imageBlocks.map(obj => openGraphFromMedia(obj));
 
 	const imageIndex = url.searchParams.get('image');
 	const imagesToShow = imageIndex ? imageTags[+imageIndex - 1] : imageTags.join('\n');
@@ -250,7 +378,9 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 	const title = `${post.blog.name} ${
 		originalPost
 			? `🔁 ${originalPost.blog?.name || originalPost.broken_blog_name}`
-			: `(${post.blog.title})`
+			: post.blog.title
+				? `(${post.blog.title})`
+				: ''
 	}`;
 
 	const audioBlocks = blocks.filter(element => element.type == 'audio') as TumblrNeueAudioBlock[];
@@ -293,6 +423,7 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 		post_id: post.id_string,
 		blog_url: post.blog.url,
 		type: embedType,
+		post_time: post.timestamp.toString(),
 	});
 
 	const collageUrl = new URL(url);
@@ -300,7 +431,7 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 
 	const collage =
 		embedType == 'photo' && imageTags.length > 1
-			? `<meta property="og:image" content="${collageUrl.href}" />`
+			? `<meta property="og:image" content="${collageUrl.href}" /><meta property="twitter:image" content="${collageUrl.href}" />`
 			: '';
 
 	const html = `<!DOCTYPE html>
@@ -329,6 +460,9 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 
 		${mediaToShow}
 
+		<link rel="alternate" href="${post.blog.url}/rss" type="application/rss+xml" />
+		<link rel="alternate" href="android-app://com.tumblr/tumblr/x-callback-url/blog?blogName=${post.blog_name}&postID=${post.id}" />
+		<link rel="alternate" href="ios-app://305343404/tumblr/x-callback-url/blog?blogName=${post.blog_name}&postID=${post.id}" />
 		<link
 			rel="alternate"
 			href="${url.protocol}//${url.hostname}/oembed?${oembedParams.toString()}"
@@ -359,49 +493,64 @@ function mainPage(post: TumblrBlocksPost, originalPost: TumblrBlocksPost | undef
 	});
 }
 
-function errorPage(error: Error, postUrl: string, url: URL, extra?: string) {
-	if (!(error instanceof TumblrAPIError)) {
-		return new Response(`Error fetching post: ${error}\n${extra}`, { status: 500 });
-	}
+function openGraphFromMedia(block: TumblrNeueImageBlock): string {
+	const media = block.media.find(media => media.has_original_dimensions) || block.media[0];
 
-	const errorDetail = error.response.errors?.at(0)?.detail;
-	const errorDescription = error.response.meta.msg + (errorDetail ? `: ${errorDetail}` : '');
-	const extraInfo = extra ? `\n${extra}` : '';
+	return `<meta property="og:image" content="${media.url}" />
+				<meta property="og:image:height" content="${media.height}" />
+				<meta property="og:image:width" content="${media.width}" />
+				<meta property="og:image:alt" content="${block.alt_text}" />
+				<meta property="twitter:image" content="${media.url}" />`;
+}
+
+function errorPage(
+	errorDescription: string,
+	url: URL,
+	status: number = 500,
+	redirect: boolean = true
+) {
+	const pathInfo = url.pathname.split('/');
+	const trimmedPathInfo = pathInfo.filter(string => string);
+	const username = trimmedPathInfo[0];
+	const postID = trimmedPathInfo[1];
+	const postUrl = `https://www.tumblr.com/${username}/${postID}`;
+
+	if (url.searchParams.has('noRedirect')) {
+		redirect = false;
+	}
 
 	const html = `<!DOCTYPE html>
 	<head>
 		<title>txTumblr</title>
-		<meta name="description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
+		<meta name="description" content="Unable to retrieve post from this link.\n\nError:\n${errorDescription}" />
 		<link rel="canonical" href="${postUrl}" />
 		<!-- OpenGraph embed tags -->
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="txTumblr" />
 		<meta property="og:url" content="${postUrl}" />
-		<meta property="og:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
+		<meta property="og:description" content="Unable to retrieve post from this link.\n\nError:\n${errorDescription}" />
 
 		<!-- Twitter embed tags -->
 		<meta name="twitter:card" content="summary">
 		<meta property="twitter:domain" content="tumblr.com">
 		<meta property="twitter:title" content="txTumblr" />
 		<meta property="twitter:url" content="${postUrl}" />
-		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nTumblr Error:\n${errorDescription}${extraInfo}" />
+		<meta property="twitter:description" content="Unable to retrieve post from this link.\n\nError:\n${errorDescription}" />
 
-		${
-			!url.searchParams.has('noRedirect')
-				? `<meta http-equiv="refresh" content="0;url=${postUrl}" />`
-				: ''
-		}
+		${redirect ? `<meta http-equiv="refresh" content="0;url=${postUrl}" />` : ''}
 
 		<meta property="theme-color" content="#aa5555" />
 	</head>
 	<body>
-		<p><a href="${postUrl}">Click here if you are not redirected automatically...</a></p>
+		<p>Error retrieving post: ${errorDescription}</p>
+
+		<p><a href="${postUrl}">${redirect ? 'Click here if you are not redirected automatically...' : 'Click here to view the source post.'}</a></p>
 	</body>`;
 
 	return new Response(html, {
+		status,
 		headers: {
 			'content-type': 'text/html;charset=UTF-8',
-			'status': error.response.meta.status.toString(),
 		},
 	});
 }

@@ -36,6 +36,7 @@
 	},
 	"dependencies": {
 		"fast-png": "^8.0.0",
+		"image-js": "^1.7.0",
 		"jpeg-js": "^0.4.4",
 		"typeble": "^1.1.1"
 	},
